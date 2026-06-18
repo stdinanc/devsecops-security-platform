@@ -1,0 +1,20 @@
+profile_name: strict
+description: "Strict profile for production-critical services"
+
+fail_on_severity: "CRITICAL,HIGH,MEDIUM"
+
+gates:
+  sonar_gate: true
+  secret_gate: true
+  vulnerability_gate: true
+  misconfig_gate: true
+  license_gate: true
+
+trivy:
+  scanners: "vuln,secret,misconfig,license"
+  vuln_type: "os,library"
+  ignore_unfixed: false
+  timeout: "15m"
+
+dependency_install:
+  enabled: true

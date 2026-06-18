@@ -1,0 +1,200 @@
+name: Reusable DevSecOps Security Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      scan_profile:
+        description: "Security scan profile (standard | strict | third-party)"
+        required: false
+        type: string
+        default: "standard"
+
+      sonar_project_key:
+        description: "SonarQube project key"
+        required: true
+        type: string
+
+      sonar_project_name:
+        description: "SonarQube project display name"
+        required: true
+        type: string
+
+      fail_on_severity:
+        description: "Trivy severity threshold (e.g. CRITICAL,HIGH)"
+        required: false
+        type: string
+        default: "CRITICAL,HIGH"
+
+      sonar_enabled:
+        description: "Enable SonarQube scan"
+        required: false
+        type: boolean
+        default: true
+
+      trivy_enabled:
+        description: "Enable Trivy scan"
+        required: false
+        type: boolean
+        default: true
+
+    secrets:
+      SONAR_TOKEN:
+        required: false
+
+      SONAR_HOST_URL:
+        required: false
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: read
+
+jobs:
+  security-analysis:
+    name: Security Analysis
+    runs-on: [self-hosted, devsecops-trial]
+    timeout-minutes: 60
+
+    env:
+      REPORT_DIR: security-reports
+      DETECT_FILE: security-reports/detected-project.json
+
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout central security platform
+        uses: actions/checkout@v4
+        with:
+          repository: stdinanc/devsecops-security-platform
+          ref: v1
+          path: security-platform
+          persist-credentials: false
+
+      - name: Prepare workspace
+        shell: bash
+        run: |
+          rm -rf "${REPORT_DIR}"
+          mkdir -p "${REPORT_DIR}"
+
+      - name: Validate runner environment
+        shell: bash
+        run: |
+          chmod +x security-platform/scripts/validate_environment.sh
+          security-platform/scripts/validate_environment.sh
+
+      - name: Auto-discover project
+        shell: bash
+        run: |
+          python3 security-platform/scripts/detect_project.py \
+            --root "." \
+            --output "${DETECT_FILE}"
+
+          cat "${DETECT_FILE}"
+
+      - name: Prepare isolated dependency environment
+        shell: bash
+        run: |
+          chmod +x security-platform/scripts/prepare_env.sh
+          security-platform/scripts/prepare_env.sh "${DETECT_FILE}"
+
+      - name: SonarQube scan
+        if: inputs.sonar_enabled == true
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ inputs.sonar_project_key }}
+            -Dsonar.projectName=${{ inputs.sonar_project_name }}
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/target/**,**/.venv/**,**/vendor/**,**/.git/**,security-platform/**
+            -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.scm.provider=git
+            -Dsonar.qualitygate.wait=true
+
+      # ── Trivy: tek fs çalışması, hem SARIF hem JSON üretir ────────────────
+      - name: Trivy scan — filesystem (JSON + SARIF)
+        if: inputs.trivy_enabled == true
+        shell: bash
+        run: |
+          TRIVY_SEVERITY="${{ inputs.fail_on_severity }}"
+
+          IGNORE_UNFIXED="--ignore-unfixed"
+          if [[ "${{ inputs.scan_profile }}" == "strict" ]]; then
+            IGNORE_UNFIXED=""
+          fi
+
+          trivy fs \
+            --config security-platform/configs/trivy.yml \
+            --scanners vuln,secret,misconfig,license \
+            --vuln-type os,library \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            ${IGNORE_UNFIXED} \
+            --format json \
+            --output "${REPORT_DIR}/trivy-results.json" \
+            .
+
+          trivy fs \
+            --config security-platform/configs/trivy.yml \
+            --scanners vuln,secret,misconfig,license \
+            --vuln-type os,library \
+            --severity "${TRIVY_SEVERITY}" \
+            ${IGNORE_UNFIXED} \
+            --format sarif \
+            --output "${REPORT_DIR}/trivy-results.sarif" \
+            .
+
+      - name: Upload Trivy SARIF to GitHub Code Scanning
+        if: inputs.trivy_enabled == true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: security-reports/trivy-results.sarif
+          category: trivy-filesystem
+
+      # ── Quality Gate ───────────────────────────────────────────────────────
+      - name: Run centralized quality gate
+        shell: bash
+        env:
+          SCAN_PROFILE: ${{ inputs.scan_profile }}
+          FAIL_ON_SEVERITY: ${{ inputs.fail_on_severity }}
+        run: |
+          chmod +x security-platform/scripts/quality_gate.sh
+          security-platform/scripts/quality_gate.sh \
+            "${REPORT_DIR}" \
+            "security-platform/configs/scan-profiles/${{ inputs.scan_profile }}.yml"
+
+      # ── GitHub Step Summary ────────────────────────────────────────────────
+      - name: Generate security summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## DevSecOps Security Scan"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Repository | \`${{ github.repository }}\` |"
+            echo "| Ref | \`${{ github.ref }}\` |"
+            echo "| Scan profile | \`${{ inputs.scan_profile }}\` |"
+            echo "| SonarQube project key | \`${{ inputs.sonar_project_key }}\` |"
+            echo "| Trivy fail severity | \`${{ inputs.fail_on_severity }}\` |"
+            echo ""
+            echo "### Detected Project"
+            echo '```json'
+            cat "${DETECT_FILE}" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.run_id }}
+          path: security-reports/
+          retention-days: 30

@@ -1,0 +1,24 @@
+profile_name: third-party
+description: "Profile for externally provided or third-party repositories"
+
+fail_on_severity: "CRITICAL,HIGH"
+
+gates:
+  sonar_gate: true
+  secret_gate: true
+  vulnerability_gate: true
+  misconfig_gate: true
+  license_gate: false
+
+trivy:
+  scanners: "vuln,secret,misconfig,license"
+  vuln_type: "os,library"
+  ignore_unfixed: true
+  timeout: "15m"
+
+dependency_install:
+  enabled: true
+
+security:
+  recommended_runner_isolation: true
+  untrusted_code: true

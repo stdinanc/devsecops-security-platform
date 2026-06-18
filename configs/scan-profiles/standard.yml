@@ -1,0 +1,20 @@
+profile_name: standard
+description: "Default security profile for internal repositories"
+
+fail_on_severity: "CRITICAL,HIGH"
+
+gates:
+  sonar_gate: true
+  secret_gate: true
+  vulnerability_gate: true
+  misconfig_gate: true
+  license_gate: false
+
+trivy:
+  scanners: "vuln,secret,misconfig,license"
+  vuln_type: "os,library"
+  ignore_unfixed: true
+  timeout: "10m"
+
+dependency_install:
+  enabled: true

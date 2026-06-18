@@ -1,0 +1,11 @@
+# .trivyignore
+# Bu dosyaya kabul edilmiş / false-positive zafiyetlerin CVE ID'lerini ekle.
+# Trivy tarama sırasında bu ID'leri otomatik olarak görmezden gelir.
+#
+# Format:
+#   CVE-YYYY-NNNNN              ← tek zafiyet
+#   CVE-YYYY-NNNNN exp:2026-12-31  ← bitiş tarihi ile geçici kabul
+#
+# Örnek:
+#   CVE-2023-12345
+#   CVE-2024-98765 exp:2026-09-01

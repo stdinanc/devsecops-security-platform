@@ -1,0 +1,29 @@
+scan:
+  skip-dirs:
+    - .git
+    - node_modules
+    - dist
+    - build
+    - target
+    - .venv
+    - venv
+    - vendor
+    - security-platform
+
+vulnerability:
+  ignore-unfixed: true
+  type:
+    - os
+    - library
+
+secret:
+  config: ""
+
+misconfiguration:
+  include-non-failures: false
+
+license:
+  full: true
+
+# False positive yönetimi — .trivyignore dosyası otomatik okunur
+ignorefile: .trivyignore
