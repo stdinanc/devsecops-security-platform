@@ -117,7 +117,6 @@ jobs:
             -Dsonar.sourceEncoding=UTF-8
             -Dsonar.scm.provider=git
             -Dsonar.qualitygate.wait=true
-            -Dsonar.java.binaries=.
 
       # ── Trivy: tek fs çalışması, hem SARIF hem JSON üretir ────────────────
       - name: Trivy scan — filesystem (JSON + SARIF)
