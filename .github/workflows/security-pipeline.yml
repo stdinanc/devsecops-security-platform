@@ -123,8 +123,6 @@ jobs:
       - name: Trivy scan — filesystem (JSON + SARIF)
         if: inputs.trivy_enabled == true
         shell: bash
-        env:
-          HOME: ${{ github.workspace }}
         run: |
           TRIVY_SEVERITY="${{ inputs.fail_on_severity }}"
 
@@ -133,11 +131,14 @@ jobs:
             IGNORE_UNFIXED=""
           fi
 
+          # --offline-scan: Maven/PyPI gibi paket depolarına istek atmayı engeller;
+          # bağımlılıklar önceki adımda zaten yerel cache'e indirilmiştir.
           trivy fs \
             --config security-platform/configs/trivy.yml \
             --scanners vuln,secret,misconfig,license \
-            --vuln-type os,library \
+            --pkg-types os,library \
             --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --offline-scan \
             ${IGNORE_UNFIXED} \
             --format json \
             --output "${REPORT_DIR}/trivy-results.json" \
@@ -146,8 +147,9 @@ jobs:
           trivy fs \
             --config security-platform/configs/trivy.yml \
             --scanners vuln,secret,misconfig,license \
-            --vuln-type os,library \
+            --pkg-types os,library \
             --severity "${TRIVY_SEVERITY}" \
+            --offline-scan \
             ${IGNORE_UNFIXED} \
             --format sarif \
             --output "${REPORT_DIR}/trivy-results.sarif" \
