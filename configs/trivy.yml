@@ -10,9 +10,8 @@ scan:
     - vendor
     - security-platform
 
-vulnerability:
-  ignore-unfixed: true
-  type:
+pkg:
+  types:
     - os
     - library
 
@@ -25,5 +24,4 @@ misconfiguration:
 license:
   full: true
 
-# False positive yönetimi — .trivyignore dosyası otomatik okunur
-ignorefile: .trivyignore
+# False positive yönetimi — .trivyignore varsa otomatik okunur, yoksa sorun çıkmaz
