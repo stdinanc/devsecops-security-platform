@@ -123,6 +123,8 @@ jobs:
       - name: Trivy scan — filesystem (JSON + SARIF)
         if: inputs.trivy_enabled == true
         shell: bash
+        env:
+          HOME: ${{ github.workspace }}
         run: |
           TRIVY_SEVERITY="${{ inputs.fail_on_severity }}"
 
