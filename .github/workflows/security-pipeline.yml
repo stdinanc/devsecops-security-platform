@@ -104,7 +104,7 @@ jobs:
 
       - name: SonarQube scan
         if: inputs.sonar_enabled == true
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -117,8 +117,6 @@ jobs:
             -Dsonar.sourceEncoding=UTF-8
             -Dsonar.scm.provider=git
             -Dsonar.qualitygate.wait=true
-            -Dsonar.java.binaries=**/target/classes,**/build/classes,**/bin,.
-            -Dsonar.java.test.binaries=**/target/test-classes,**/build/test-classes
 
       # ── Trivy: tek fs çalışması, hem SARIF hem JSON üretir ────────────────
       - name: Trivy scan — filesystem (JSON + SARIF)
